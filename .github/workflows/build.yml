@@ -25,11 +25,15 @@ jobs:
           cp -r /tmp/mod/gradlew* .
           rm -rf /tmp/mod
 
-      - name: Clean Template
+      - name: Clean Template & Fix Loom Version
         run: |
           rm -rf src/main/java/com/example/ExampleMod.java
           rm -rf src/main/java/com/example/ExampleModClient.java
           mkdir -p src/main/resources/assets/animeoverlord/lang
+          
+          # SỬA LỖI TẠI ĐÂY: Ép phiên bản Loom và Gradle cũ phù hợp với Java 17 / MC 1.20.1
+          sed -i 's/id "fabric-loom" version ".*"/id "fabric-loom" version "1.6.12"/' build.gradle
+          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-bin.zip/' gradle/wrapper/gradle-wrapper.properties
 
       - name: Inject Gojo & Sukuna Code
         run: |
@@ -44,7 +48,6 @@ jobs:
             "authors": ["You"],
             "contact": {},
             "license": "MIT",
-            "icon": "assets/animeoverlord/icon.png",
             "environment": "*",
             "entrypoints": {
               "main": ["com.example.AnimeOverlord"],
@@ -120,7 +123,7 @@ jobs:
           }
           EOF
 
-          # 4. Class xử lý Domain Sukuna (Ác Mộc Cứu Ảnh)
+          # 4. Class xử lý Domain Sukuna
           cat << 'EOF' > src/main/java/com/example/DomainHandler.java
           package com.example;
 
@@ -139,7 +142,6 @@ jobs:
 
               public static void init() {
                   ServerTickEvents.END_SERVER_TICK.register(server -> {
-                      // Kích hoạt Ác Mộc Cứu Ảnh
                       Iterator<Map.Entry<UUID, Integer>> iterator = ACTIVE_DOMAINS.entrySet().iterator();
                       while (iterator.hasNext()) {
                           Map.Entry<UUID, Integer> entry = iterator.next();
@@ -155,7 +157,6 @@ jobs:
                           double radius = 15.0;
                           Box area = player.getBoundingBox().expand(radius);
 
-                          // Sát thương mỗi 0.5s (10 ticks)
                           if (ticksLeft % 10 == 0) {
                               List<LivingEntity> entities = world.getEntitiesByClass(LivingEntity.class, area, e -> e != player);
                               for (LivingEntity e : entities) {
@@ -165,7 +166,6 @@ jobs:
                               }
                           }
 
-                          // Hiệu ứng hạt
                           if (ticksLeft % 2 == 0) {
                               for (int i = 0; i < 5; i++) {
                                   double ox = (world.random.nextDouble() - 0.5) * radius * 2;
@@ -178,13 +178,12 @@ jobs:
                           if (ticksLeft <= 0) {
                               iterator.remove();
                               player.sendMessage(Text.literal("§c[Ác Mộc Cứu Ảnh] §fĐã kết thúc!"), false);
-                              COOLDOWNS.put(player.getUuid(), 400); // 20s cooldown
+                              COOLDOWNS.put(player.getUuid(), 400);
                           } else {
                               entry.setValue(ticksLeft);
                           }
                       }
 
-                      // Giảm hồi chiêu
                       Iterator<Map.Entry<UUID, Integer>> cdIterator = COOLDOWNS.entrySet().iterator();
                       while (cdIterator.hasNext()) {
                           Map.Entry<UUID, Integer> entry = cdIterator.next();
@@ -210,7 +209,7 @@ jobs:
                       player.sendMessage(Text.literal("§c[Ác Mộc Cứu Ảnh] §fHồi chiêu: " + (COOLDOWNS.get(uuid) / 20) + "s"), false);
                       return;
                   }
-                  ACTIVE_DOMAINS.put(uuid, 300); // 15s = 300 ticks
+                  ACTIVE_DOMAINS.put(uuid, 300);
                   player.sendMessage(Text.literal("§4[Ác Mộc Cứu Ảnh] §fKhai triển!"), false);
               }
           }
@@ -234,7 +233,6 @@ jobs:
                   DomainHandler.init();
 
                   CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-                      // Lệnh Vô Hạ Hạn
                       dispatcher.register(CommandManager.literal("infinity")
                           .then(CommandManager.literal("toggle").executes(context -> {
                               ServerPlayerEntity player = context.getSource().getPlayer();
@@ -263,7 +261,6 @@ jobs:
                               })))
                       );
 
-                      // Lệnh Domain
                       dispatcher.register(CommandManager.literal("domain")
                           .then(CommandManager.literal("toggle").executes(context -> {
                               ServerPlayerEntity player = context.getSource().getPlayer();
@@ -296,14 +293,14 @@ jobs:
                   infinityKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                       "key.animeoverlord.infinity",
                       InputUtil.Type.KEYSYM,
-                      GLFW.GLFW_KEY_V, // Mặc định V
+                      GLFW.GLFW_KEY_V,
                       "category.animeoverlord.keys"
                   ));
 
                   domainKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
                       "key.animeoverlord.domain",
                       InputUtil.Type.KEYSYM,
-                      GLFW.GLFW_KEY_B, // Mặc định B
+                      GLFW.GLFW_KEY_B,
                       "category.animeoverlord.keys"
                   ));
 
