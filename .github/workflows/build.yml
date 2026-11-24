@@ -1,0 +1,217 @@
+name: Build Gojo Infinity Mod
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download Fabric Template
+        run: |
+          git clone https://github.com/FabricMC/fabric-example-mod.git /tmp/mod
+          cp -r /tmp/mod/* .
+          cp -r /tmp/mod/gradlew* .
+          rm -rf /tmp/mod
+
+      - name: Clean Template
+        run: |
+          rm -rf src/main/java/com/example/ExampleMod.java
+          rm -rf src/main/java/com/example/ExampleModClient.java
+          mkdir -p src/main/resources/assets/animeoverlord/lang
+
+      - name: Inject Gojo Infinity Code
+        run: |
+          # 1. Cấu hình fabric.mod.json
+          cat << 'EOF' > src/main/resources/fabric.mod.json
+          {
+            "schemaVersion": 1,
+            "id": "animeoverlord",
+            "version": "1.0.0",
+            "name": "Gojo Infinity",
+            "description": "Infinity from Jujutsu Kaisen",
+            "authors": ["You"],
+            "contact": {},
+            "license": "MIT",
+            "icon": "assets/animeoverlord/icon.png",
+            "environment": "*",
+            "entrypoints": {
+              "main": ["com.example.AnimeOverlord"],
+              "client": ["com.example.AnimeOverlordClient"]
+            },
+            "depends": {
+              "fabricloader": ">=0.14.21",
+              "fabric-api": "*",
+              "minecraft": "~1.20.1",
+              "java": ">=17"
+            }
+          }
+          EOF
+
+          # 2. Ngôn ngữ (Tên phím tắt)
+          cat << 'EOF' > src/main/resources/assets/animeoverlord/lang/en_us.json
+          {
+            "key.animeoverlord.toggle": "Toggle Infinity",
+            "category.animeoverlord.keys": "Gojo Infinity"
+          }
+          EOF
+          
+          cat << 'EOF' > src/main/resources/assets/animeoverlord/lang/vi_vn.json
+          {
+            "key.animeoverlord.toggle": "Bật/Tắt Vô Hạ Hạn",
+            "category.animeoverlord.keys": "Gojo Infinity"
+          }
+          EOF
+
+          # 3. Class xử lý logic Vô Hạ Hạn (Server-side)
+          cat << 'EOF' > src/main/java/com/example/InfinityHandler.java
+          package com.example;
+
+          import net.fabricmc.fabric.api.entity.event.v1.ServerLivingEntityEvents;
+          import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+          import net.minecraft.entity.Entity;
+          import net.minecraft.entity.projectile.ProjectileEntity;
+          import net.minecraft.server.network.ServerPlayerEntity;
+          import net.minecraft.util.math.Box;
+          import java.util.*;
+
+          public class InfinityHandler {
+              public static final Set<UUID> ACTIVE_PLAYERS = new HashSet<>();
+              public static final Map<UUID, Double> RADIUS_MAP = new HashMap<>();
+
+              public static void init() {
+                  // Chặn mọi sát thương
+                  ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
+                      if (entity instanceof ServerPlayerEntity player) {
+                          if (ACTIVE_PLAYERS.contains(player.getUuid())) {
+                              return false; // Hủy sát thương (Vô hạ hạn)
+                          }
+                      }
+                      return true;
+                  });
+
+                  // Đóng băng đạn/mũi tên trong bán kính
+                  ServerTickEvents.END_SERVER_TICK.register(server -> {
+                      for (UUID uuid : ACTIVE_PLAYERS) {
+                          ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
+                          if (player != null) {
+                              double radius = RADIUS_MAP.getOrDefault(uuid, 5.0);
+                              Box area = player.getBoundingBox().expand(radius);
+                              List<Entity> entities = player.getWorld().getOtherEntities(player, area);
+                              for (Entity e : entities) {
+                                  if (e instanceof ProjectileEntity) {
+                                      e.setVelocity(0, 0, 0); // Khựng lại giữa không trung
+                                      e.setPosition(e.getX(), e.getY(), e.getZ());
+                                  }
+                              }
+                          }
+                      }
+                  });
+              }
+          }
+          EOF
+
+          # 4. Class chính (Đăng ký lệnh)
+          cat << 'EOF' > src/main/java/com/example/AnimeOverlord.java
+          package com.example;
+
+          import net.fabricmc.api.ModInitializer;
+          import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
+          import net.minecraft.server.command.CommandManager;
+          import net.minecraft.server.network.ServerPlayerEntity;
+          import net.minecraft.text.Text;
+          import java.util.UUID;
+
+          public class AnimeOverlord implements ModInitializer {
+              @Override
+              public void onInitialize() {
+                  InfinityHandler.init();
+
+                  CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+                      dispatcher.register(CommandManager.literal("infinity")
+                          .then(CommandManager.literal("toggle").executes(context -> {
+                              ServerPlayerEntity player = context.getSource().getPlayer();
+                              if (player != null) {
+                                  UUID uuid = player.getUuid();
+                                  if (InfinityHandler.ACTIVE_PLAYERS.contains(uuid)) {
+                                      InfinityHandler.ACTIVE_PLAYERS.remove(uuid);
+                                      player.sendMessage(Text.literal("§b[Vô Hạ Hạn] §cĐã TẮT"), false);
+                                  } else {
+                                      InfinityHandler.ACTIVE_PLAYERS.add(uuid);
+                                      player.sendMessage(Text.literal("§b[Vô Hạ Hạn] §aĐã BẬT (Bất tử)"), false);
+                                  }
+                              }
+                              return 1;
+                          }))
+                          .then(CommandManager.literal("radius")
+                              .then(CommandManager.argument("r", com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(1.0, 30.0))
+                              .executes(context -> {
+                                  ServerPlayerEntity player = context.getSource().getPlayer();
+                                  if (player != null) {
+                                      double r = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(context, "r");
+                                      InfinityHandler.RADIUS_MAP.put(player.getUuid(), r);
+                                      player.sendMessage(Text.literal("§b[Vô Hạ Hạn] §eBán kính: " + r + " blocks"), false);
+                                  }
+                                  return 1;
+                              })))
+                      );
+                  });
+              }
+          }
+          EOF
+
+          # 5. Client Class (Bắt phím tắt V)
+          cat << 'EOF' > src/main/java/com/example/AnimeOverlordClient.java
+          package com.example;
+
+          import net.fabricmc.api.ClientModInitializer;
+          import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+          import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+          import net.minecraft.client.option.KeyBinding;
+          import net.minecraft.client.util.InputUtil;
+          import org.lwjgl.glfw.GLFW;
+
+          public class AnimeOverlordClient implements ClientModInitializer {
+              public static KeyBinding toggleKey;
+
+              @Override
+              public void onInitializeClient() {
+                  toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                      "key.animeoverlord.toggle",
+                      InputUtil.Type.KEYSYM,
+                      GLFW.GLFW_KEY_V, // Mặc định là phím V
+                      "category.animeoverlord.keys"
+                  ));
+
+                  ClientTickEvents.END_CLIENT_TICK.register(client -> {
+                      while (toggleKey.wasPressed()) {
+                          if (client.player != null && client.player.networkHandler != null) {
+                              client.player.networkHandler.sendChatCommand("infinity toggle");
+                          }
+                      }
+                  });
+              }
+          }
+          EOF
+
+      - name: Build Mod
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-daemon
+
+      - name: Upload Mod
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gojo-Infinity-Mod
+          path: build/libs/*.jar
