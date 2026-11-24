@@ -1,4 +1,4 @@
-name: Build Gojo Infinity Mod
+name: Build Gojo vs Sukuna Mod
 
 on:
   push:
@@ -31,16 +31,16 @@ jobs:
           rm -rf src/main/java/com/example/ExampleModClient.java
           mkdir -p src/main/resources/assets/animeoverlord/lang
 
-      - name: Inject Gojo Infinity Code
+      - name: Inject Gojo & Sukuna Code
         run: |
           # 1. Cấu hình fabric.mod.json
           cat << 'EOF' > src/main/resources/fabric.mod.json
           {
             "schemaVersion": 1,
             "id": "animeoverlord",
-            "version": "1.0.0",
-            "name": "Gojo Infinity",
-            "description": "Infinity from Jujutsu Kaisen",
+            "version": "1.1.0",
+            "name": "Gojo & Sukuna Overlord",
+            "description": "Infinity and Malevolent Shrine",
             "authors": ["You"],
             "contact": {},
             "license": "MIT",
@@ -59,22 +59,24 @@ jobs:
           }
           EOF
 
-          # 2. Ngôn ngữ (Tên phím tắt)
+          # 2. Ngôn ngữ (Việt hóa 100%)
           cat << 'EOF' > src/main/resources/assets/animeoverlord/lang/en_us.json
           {
-            "key.animeoverlord.toggle": "Toggle Infinity",
-            "category.animeoverlord.keys": "Gojo Infinity"
+            "key.animeoverlord.infinity": "Toggle Infinity",
+            "key.animeoverlord.domain": "Cast Domain",
+            "category.animeoverlord.keys": "Gojo & Sukuna"
           }
           EOF
           
           cat << 'EOF' > src/main/resources/assets/animeoverlord/lang/vi_vn.json
           {
-            "key.animeoverlord.toggle": "Bật/Tắt Vô Hạ Hạn",
-            "category.animeoverlord.keys": "Gojo Infinity"
+            "key.animeoverlord.infinity": "Bật/Tắt Vô Hạ Hạn",
+            "key.animeoverlord.domain": "Khai Triển Ác Mộc Cứu Ảnh",
+            "category.animeoverlord.keys": "Gojo & Sukuna"
           }
           EOF
 
-          # 3. Class xử lý logic Vô Hạ Hạn (Server-side)
+          # 3. Class xử lý Vô Hạ Hạn
           cat << 'EOF' > src/main/java/com/example/InfinityHandler.java
           package com.example;
 
@@ -91,17 +93,13 @@ jobs:
               public static final Map<UUID, Double> RADIUS_MAP = new HashMap<>();
 
               public static void init() {
-                  // Chặn mọi sát thương
                   ServerLivingEntityEvents.ALLOW_DAMAGE.register((entity, source, amount) -> {
                       if (entity instanceof ServerPlayerEntity player) {
-                          if (ACTIVE_PLAYERS.contains(player.getUuid())) {
-                              return false; // Hủy sát thương (Vô hạ hạn)
-                          }
+                          if (ACTIVE_PLAYERS.contains(player.getUuid())) return false;
                       }
                       return true;
                   });
 
-                  // Đóng băng đạn/mũi tên trong bán kính
                   ServerTickEvents.END_SERVER_TICK.register(server -> {
                       for (UUID uuid : ACTIVE_PLAYERS) {
                           ServerPlayerEntity player = server.getPlayerManager().getPlayer(uuid);
@@ -111,7 +109,7 @@ jobs:
                               List<Entity> entities = player.getWorld().getOtherEntities(player, area);
                               for (Entity e : entities) {
                                   if (e instanceof ProjectileEntity) {
-                                      e.setVelocity(0, 0, 0); // Khựng lại giữa không trung
+                                      e.setVelocity(0, 0, 0);
                                       e.setPosition(e.getX(), e.getY(), e.getZ());
                                   }
                               }
@@ -122,7 +120,103 @@ jobs:
           }
           EOF
 
-          # 4. Class chính (Đăng ký lệnh)
+          # 4. Class xử lý Domain Sukuna (Ác Mộc Cứu Ảnh)
+          cat << 'EOF' > src/main/java/com/example/DomainHandler.java
+          package com.example;
+
+          import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
+          import net.minecraft.entity.LivingEntity;
+          import net.minecraft.particle.ParticleTypes;
+          import net.minecraft.server.network.ServerPlayerEntity;
+          import net.minecraft.server.world.ServerWorld;
+          import net.minecraft.text.Text;
+          import net.minecraft.util.math.Box;
+          import java.util.*;
+
+          public class DomainHandler {
+              public static final Map<UUID, Integer> ACTIVE_DOMAINS = new HashMap<>();
+              public static final Map<UUID, Integer> COOLDOWNS = new HashMap<>();
+
+              public static void init() {
+                  ServerTickEvents.END_SERVER_TICK.register(server -> {
+                      // Kích hoạt Ác Mộc Cứu Ảnh
+                      Iterator<Map.Entry<UUID, Integer>> iterator = ACTIVE_DOMAINS.entrySet().iterator();
+                      while (iterator.hasNext()) {
+                          Map.Entry<UUID, Integer> entry = iterator.next();
+                          ServerPlayerEntity player = server.getPlayerManager().getPlayer(entry.getKey());
+                          int ticksLeft = entry.getValue();
+
+                          if (player == null || player.isDead()) {
+                              iterator.remove();
+                              continue;
+                          }
+
+                          ServerWorld world = (ServerWorld) player.getWorld();
+                          double radius = 15.0;
+                          Box area = player.getBoundingBox().expand(radius);
+
+                          // Sát thương mỗi 0.5s (10 ticks)
+                          if (ticksLeft % 10 == 0) {
+                              List<LivingEntity> entities = world.getEntitiesByClass(LivingEntity.class, area, e -> e != player);
+                              for (LivingEntity e : entities) {
+                                  if (e instanceof ServerPlayerEntity target && InfinityHandler.ACTIVE_PLAYERS.contains(target.getUuid())) continue;
+                                  e.damage(world.getDamageSources().magic(), 5.0f);
+                                  world.spawnParticles(ParticleTypes.DAMAGE_INDICATOR, e.getX(), e.getY() + 1.0, e.getZ(), 5, 0.5, 0.5, 0.5, 0.1);
+                              }
+                          }
+
+                          // Hiệu ứng hạt
+                          if (ticksLeft % 2 == 0) {
+                              for (int i = 0; i < 5; i++) {
+                                  double ox = (world.random.nextDouble() - 0.5) * radius * 2;
+                                  double oz = (world.random.nextDouble() - 0.5) * radius * 2;
+                                  world.spawnParticles(ParticleTypes.SOUL_FIRE_FLAME, player.getX() + ox, player.getY() + 0.5, player.getZ() + oz, 2, 0, 0.5, 0, 0.05);
+                              }
+                          }
+
+                          ticksLeft--;
+                          if (ticksLeft <= 0) {
+                              iterator.remove();
+                              player.sendMessage(Text.literal("§c[Ác Mộc Cứu Ảnh] §fĐã kết thúc!"), false);
+                              COOLDOWNS.put(player.getUuid(), 400); // 20s cooldown
+                          } else {
+                              entry.setValue(ticksLeft);
+                          }
+                      }
+
+                      // Giảm hồi chiêu
+                      Iterator<Map.Entry<UUID, Integer>> cdIterator = COOLDOWNS.entrySet().iterator();
+                      while (cdIterator.hasNext()) {
+                          Map.Entry<UUID, Integer> entry = cdIterator.next();
+                          int ticks = entry.getValue() - 1;
+                          if (ticks <= 0) {
+                              cdIterator.remove();
+                              ServerPlayerEntity player = server.getPlayerManager().getPlayer(entry.getKey());
+                              if (player != null) player.sendMessage(Text.literal("§a[Ác Mộc Cứu Ảnh] §fĐã sẵn sàng!"), false);
+                          } else {
+                              entry.setValue(ticks);
+                          }
+                      }
+                  });
+              }
+
+              public static void castDomain(ServerPlayerEntity player) {
+                  UUID uuid = player.getUuid();
+                  if (ACTIVE_DOMAINS.containsKey(uuid)) {
+                      player.sendMessage(Text.literal("§c[Ác Mộc Cứu Ảnh] §fĐang thi triển!"), false);
+                      return;
+                  }
+                  if (COOLDOWNS.containsKey(uuid)) {
+                      player.sendMessage(Text.literal("§c[Ác Mộc Cứu Ảnh] §fHồi chiêu: " + (COOLDOWNS.get(uuid) / 20) + "s"), false);
+                      return;
+                  }
+                  ACTIVE_DOMAINS.put(uuid, 300); // 15s = 300 ticks
+                  player.sendMessage(Text.literal("§4[Ác Mộc Cứu Ảnh] §fKhai triển!"), false);
+              }
+          }
+          EOF
+
+          # 5. Class chính (Đăng ký lệnh)
           cat << 'EOF' > src/main/java/com/example/AnimeOverlord.java
           package com.example;
 
@@ -137,8 +231,10 @@ jobs:
               @Override
               public void onInitialize() {
                   InfinityHandler.init();
+                  DomainHandler.init();
 
                   CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
+                      // Lệnh Vô Hạ Hạn
                       dispatcher.register(CommandManager.literal("infinity")
                           .then(CommandManager.literal("toggle").executes(context -> {
                               ServerPlayerEntity player = context.getSource().getPlayer();
@@ -161,17 +257,26 @@ jobs:
                                   if (player != null) {
                                       double r = com.mojang.brigadier.arguments.DoubleArgumentType.getDouble(context, "r");
                                       InfinityHandler.RADIUS_MAP.put(player.getUuid(), r);
-                                      player.sendMessage(Text.literal("§b[Vô Hạ Hạn] §eBán kính: " + r + " blocks"), false);
+                                      player.sendMessage(Text.literal("§b[Vô Hạ Hạn] §eBán kính: " + r), false);
                                   }
                                   return 1;
                               })))
+                      );
+
+                      // Lệnh Domain
+                      dispatcher.register(CommandManager.literal("domain")
+                          .then(CommandManager.literal("toggle").executes(context -> {
+                              ServerPlayerEntity player = context.getSource().getPlayer();
+                              if (player != null) DomainHandler.castDomain(player);
+                              return 1;
+                          }))
                       );
                   });
               }
           }
           EOF
 
-          # 5. Client Class (Bắt phím tắt V)
+          # 6. Client Class (Bắt phím tắt V và B)
           cat << 'EOF' > src/main/java/com/example/AnimeOverlordClient.java
           package com.example;
 
@@ -183,21 +288,34 @@ jobs:
           import org.lwjgl.glfw.GLFW;
 
           public class AnimeOverlordClient implements ClientModInitializer {
-              public static KeyBinding toggleKey;
+              public static KeyBinding infinityKey;
+              public static KeyBinding domainKey;
 
               @Override
               public void onInitializeClient() {
-                  toggleKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
-                      "key.animeoverlord.toggle",
+                  infinityKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                      "key.animeoverlord.infinity",
                       InputUtil.Type.KEYSYM,
-                      GLFW.GLFW_KEY_V, // Mặc định là phím V
+                      GLFW.GLFW_KEY_V, // Mặc định V
+                      "category.animeoverlord.keys"
+                  ));
+
+                  domainKey = KeyBindingHelper.registerKeyBinding(new KeyBinding(
+                      "key.animeoverlord.domain",
+                      InputUtil.Type.KEYSYM,
+                      GLFW.GLFW_KEY_B, // Mặc định B
                       "category.animeoverlord.keys"
                   ));
 
                   ClientTickEvents.END_CLIENT_TICK.register(client -> {
-                      while (toggleKey.wasPressed()) {
+                      while (infinityKey.wasPressed()) {
                           if (client.player != null && client.player.networkHandler != null) {
                               client.player.networkHandler.sendChatCommand("infinity toggle");
+                          }
+                      }
+                      while (domainKey.wasPressed()) {
+                          if (client.player != null && client.player.networkHandler != null) {
+                              client.player.networkHandler.sendChatCommand("domain toggle");
                           }
                       }
                   });
@@ -213,5 +331,5 @@ jobs:
       - name: Upload Mod
         uses: actions/upload-artifact@v4
         with:
-          name: Gojo-Infinity-Mod
+          name: Gojo-Sukuna-Mod
           path: build/libs/*.jar
