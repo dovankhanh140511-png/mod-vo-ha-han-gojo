@@ -18,22 +18,32 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Download Fabric Template
+      - name: Download 1.20.1 Fabric Template
         run: |
-          git clone https://github.com/FabricMC/fabric-example-mod.git /tmp/mod
+          # Sử dụng một template đã được cấu hình sẵn cho MC 1.20.1 (Loom 1.3)
+          git clone https://github.com/MaxMorfiX/FabricTutorialMod1-20-1.git /tmp/mod
           cp -r /tmp/mod/* .
           cp -r /tmp/mod/gradlew* .
           rm -rf /tmp/mod
+          
+          # Ghi đè file gradle.properties để đảm bảo đúng phiên bản 1.20.1
+          cat << 'EOF' > gradle.properties
+          org.gradle.jvmargs=-Xmx1G
+          org.gradle.parallel=true
+          minecraft_version=1.20.1
+          yarn_mappings=1.20.1+build.10
+          loader_version=0.14.21
+          fabric_version=0.83.0+1.20.1
+          mod_version=1.1.0
+          maven_group=com.example
+          archives_base_name=animeoverlord
+          EOF
 
-      - name: Clean Template & Fix Loom Version
+      - name: Clean Template
         run: |
           rm -rf src/main/java/com/example/ExampleMod.java
           rm -rf src/main/java/com/example/ExampleModClient.java
           mkdir -p src/main/resources/assets/animeoverlord/lang
-          
-          # SỬA LỖI TẠI ĐÂY: Ép phiên bản Loom và Gradle cũ phù hợp với Java 17 / MC 1.20.1
-          sed -i 's/id "fabric-loom" version ".*"/id "fabric-loom" version "1.6.12"/' build.gradle
-          sed -i 's/distributionUrl=.*/distributionUrl=https\\:\/\/services.gradle.org\/distributions\/gradle-8.7-bin.zip/' gradle/wrapper/gradle-wrapper.properties
 
       - name: Inject Gojo & Sukuna Code
         run: |
