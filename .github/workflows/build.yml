@@ -20,13 +20,13 @@ jobs:
 
       - name: Download 1.20.1 Fabric Template
         run: |
-          # Sử dụng một template đã được cấu hình sẵn cho MC 1.20.1 (Loom 1.3)
+          # Tải template chuẩn cho MC 1.20.1
           git clone https://github.com/MaxMorfiX/FabricTutorialMod1-20-1.git /tmp/mod
           cp -r /tmp/mod/* .
           cp -r /tmp/mod/gradlew* .
           rm -rf /tmp/mod
           
-          # Ghi đè file gradle.properties để đảm bảo đúng phiên bản 1.20.1
+          # Ghi đè file gradle.properties để chốt đúng phiên bản
           cat << 'EOF' > gradle.properties
           org.gradle.jvmargs=-Xmx1G
           org.gradle.parallel=true
@@ -39,10 +39,14 @@ jobs:
           archives_base_name=animeoverlord
           EOF
 
-      - name: Clean Template
+      - name: Clean & Recreate Directories
         run: |
-          rm -rf src/main/java/com/example/ExampleMod.java
-          rm -rf src/main/java/com/example/ExampleModClient.java
+          # Xóa sạch code Java và Resources cũ để tránh xung đột
+          rm -rf src/main/java/*
+          rm -rf src/main/resources/*
+          
+          # TẠO LẠI THƯ MỤC CHUẨN (Đây là chỗ sửa lỗi lần trước)
+          mkdir -p src/main/java/com/example
           mkdir -p src/main/resources/assets/animeoverlord/lang
 
       - name: Inject Gojo & Sukuna Code
